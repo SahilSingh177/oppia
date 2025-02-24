@@ -28,15 +28,19 @@ import subprocess
 import sys
 import threading
 
+from core import feconf
 from core import utils
 from scripts import common
-from scripts import install_python_dev_dependencies
-from scripts import install_third_party_libs
-from scripts import servers
 
 import rcssmin
 from typing import (
-    Deque, Dict, List, Optional, Sequence, TextIO, Tuple, TypedDict)
+    Deque, Dict, List, Optional, Sequence, TextIO, Tuple, TypedDict
+)
+
+if not feconf.OPPIA_IS_DOCKERIZED:
+    from scripts import install_python_dev_dependencies
+    from scripts import install_third_party_libs
+    from scripts import servers
 
 ASSETS_DEV_DIR = os.path.join('assets', '')
 ASSETS_OUT_DIR = os.path.join('build', 'assets', '')
@@ -141,7 +145,10 @@ FILEPATHS_PROVIDED_TO_FRONTEND = (
 
 HASH_BLOCK_SIZE = 2**20
 
-APP_DEV_YAML_FILEPATH = 'app_dev.yaml'
+APP_DEV_YAML_FILEPATH = (
+    'app_dev_docker.yaml' if feconf.OPPIA_IS_DOCKERIZED else 'app_dev.yaml'
+)
+
 APP_YAML_FILEPATH = 'app.yaml'
 
 MAX_OLD_SPACE_SIZE_FOR_WEBPACK_BUILD = 8192
@@ -204,7 +211,6 @@ def run_webpack_compilation(source_maps: bool = False) -> None:
         except subprocess.CalledProcessError as error:
             print(error.output)
             sys.exit(error.returncode)
-            return
         if os.path.isdir(webpack_bundles_dir_name):
             break
     else:
@@ -233,7 +239,8 @@ def build_js_files(dev_mode: bool, source_maps: bool = False) -> None:
     else:
         main(args=[])
         common.run_ng_compilation()
-        run_webpack_compilation(source_maps=source_maps)
+        if not feconf.OPPIA_IS_DOCKERIZED:
+            run_webpack_compilation(source_maps=source_maps)
 
 
 def generate_app_yaml(deploy_mode: bool = False) -> None:
@@ -279,10 +286,8 @@ def _minify_css(source_path: str, target_path: str) -> None:
         target_path: str. Absolute path to location where to copy
             the minified file.
     """
-    source_path = common.convert_to_posixpath(
-        os.path.relpath(source_path))
-    target_path = common.convert_to_posixpath(
-        os.path.relpath(target_path))
+    source_path = os.path.relpath(source_path)
+    target_path = os.path.relpath(target_path)
     with utils.open_file(source_path, 'r') as source_file:
         with utils.open_file(target_path, 'w') as target_file:
             target_file.write(rcssmin.cssmin(source_file.read()))
@@ -324,10 +329,21 @@ def _minify_and_create_sourcemap(
     """
     print('Minifying and creating sourcemap for %s' % source_path)
     source_map_properties = 'includeSources,url=\'third_party.min.js.map\''
-    cmd = '%s %s %s -c -m --source-map %s -o %s ' % (
-        common.NODE_BIN_PATH, UGLIFY_FILE, source_path,
-        source_map_properties, target_file_path)
-    subprocess.check_call(cmd, shell=True)
+    # TODO(#18260): Change this when we permanently move to
+    # the Dockerized Setup.
+    if feconf.OPPIA_IS_DOCKERIZED:
+        subprocess.check_call(
+            'node /app/oppia/node_modules/uglify-js/bin/uglifyjs'
+            ' /app/oppia/third_party/generated/js/third_party.js'
+            ' -c -m --source-map includeSources,url=\'third_party.min.js.map\''
+            ' -o /app/oppia/third_party/generated/js/third_party.min.js',
+            shell=True
+        )
+    else:
+        cmd = '%s %s %s -c -m --source-map %s -o %s ' % (
+            common.NODE_BIN_PATH, UGLIFY_FILE, source_path,
+            source_map_properties, target_file_path)
+        subprocess.check_call(cmd, shell=True)
 
 
 def _generate_copy_tasks_for_fonts(
@@ -366,18 +382,6 @@ def _insert_hash(filepath: str, file_hash: str) -> str:
     return '%s.%s%s' % (filepath, file_hash, file_extension)
 
 
-def ensure_directory_exists(filepath: str) -> None:
-    """Ensures if directory tree exists, if not creates the directories.
-
-    Args:
-        filepath: str. Path to file located in directory that we want to ensure
-            exists.
-    """
-    directory = os.path.dirname(filepath)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-
 def safe_delete_directory_tree(directory_path: str) -> None:
     """Recursively delete a directory tree. If directory tree does not exist,
     create the directories first then delete the directory tree.
@@ -385,7 +389,7 @@ def safe_delete_directory_tree(directory_path: str) -> None:
     Args:
         directory_path: str. Directory path to be deleted.
     """
-    ensure_directory_exists(directory_path)
+    common.ensure_directory_exists(directory_path)
     shutil.rmtree(directory_path)
 
 
@@ -601,7 +605,7 @@ def get_dependencies_filepaths() -> Dict[str, List[str]]:
     with utils.open_file(DEPENDENCIES_FILE_PATH, 'r') as json_file:
         dependencies_json = json.loads(
             json_file.read(), object_pairs_hook=collections.OrderedDict)
-    frontend_dependencies = dependencies_json['dependencies']['frontend']
+    frontend_dependencies = dependencies_json['frontendDependencies']
     for dependency in frontend_dependencies.values():
         if 'bundle' in dependency:
             dependency_dir = get_dependency_directory(dependency)
@@ -655,17 +659,17 @@ def build_third_party_libs(third_party_directory_path: str) -> None:
         third_party_directory_path, WEBFONTS_RELATIVE_DIRECTORY_PATH)
 
     dependency_filepaths = get_dependencies_filepaths()
-    ensure_directory_exists(third_party_js_filepath)
+    common.ensure_directory_exists(os.path.dirname(third_party_js_filepath))
     with utils.open_file(
         third_party_js_filepath, 'w+') as third_party_js_file:
         _join_files(dependency_filepaths['js'], third_party_js_file)
 
-    ensure_directory_exists(third_party_css_filepath)
+    common.ensure_directory_exists(os.path.dirname(third_party_css_filepath))
     with utils.open_file(
         third_party_css_filepath, 'w+') as third_party_css_file:
         _join_files(dependency_filepaths['css'], third_party_css_file)
 
-    ensure_directory_exists(webfonts_dir)
+    common.ensure_directory_exists(webfonts_dir)
     _execute_tasks(
         _generate_copy_tasks_for_fonts(
             dependency_filepaths['fonts'], webfonts_dir))
@@ -780,17 +784,14 @@ def generate_copy_tasks_to_copy_from_source_to_target(
             if not any(
                     source_path.endswith(p) for p in FILE_EXTENSIONS_TO_IGNORE):
                 target_path = source_path
-                # The path in hashes.json file is in posix style,
-                # see the comment above HASHES_JSON_FILENAME for details.
-                relative_path = common.convert_to_posixpath(
-                    os.path.relpath(source_path, start=source))
+                relative_path = os.path.relpath(source_path, start=source)
                 if (hash_should_be_inserted(source + relative_path) and
                         relative_path in file_hashes):
                     relative_path = (
                         _insert_hash(relative_path, file_hashes[relative_path]))
 
                 target_path = os.path.join(os.getcwd(), target, relative_path)
-                ensure_directory_exists(target_path)
+                common.ensure_directory_exists(os.path.dirname(target_path))
                 copy_task = threading.Thread(
                     target=safe_copy_file,
                     args=(source_path, target_path,))
@@ -878,12 +879,9 @@ def get_file_hashes(directory_path: str) -> Dict[str, str]:
             filepath = os.path.join(root, filename)
             if should_file_be_built(filepath) and not any(
                     filename.endswith(p) for p in FILE_EXTENSIONS_TO_IGNORE):
-                # The path in hashes.json file is in posix style,
-                # see the comment above HASHES_JSON_FILENAME for details.
-                complete_filepath = common.convert_to_posixpath(
-                    os.path.join(root, filename))
-                relative_filepath = common.convert_to_posixpath(os.path.relpath(
-                    complete_filepath, start=directory_path))
+                complete_filepath = os.path.join(root, filename)
+                relative_filepath = os.path.relpath(
+                    complete_filepath, start=directory_path)
                 file_hashes[relative_filepath] = generate_md5_hash(
                     complete_filepath)
 
@@ -915,18 +913,15 @@ def save_hashes_to_file(file_hashes: Dict[str, str]) -> None:
     Args:
         file_hashes: dict(str, str). Dictionary with filepaths as keys and
             hashes of file content as values.
-
-    Returns:
-        str. JS code loading hashes as JSON into variable.
     """
     # Only some of the hashes are needed in the frontend.
     filtered_hashes = filter_hashes(file_hashes)
 
-    ensure_directory_exists(HASHES_JSON_FILEPATH)
+    common.ensure_directory_exists(os.path.dirname(HASHES_JSON_FILEPATH))
     with utils.open_file(HASHES_JSON_FILEPATH, 'w+') as hashes_json_file:
         hashes_json_file.write(
             str(json.dumps(filtered_hashes, ensure_ascii=False)))
-        hashes_json_file.write(u'\n')
+        hashes_json_file.write('\n')
 
 
 def minify_func(source_path: str, target_path: str, filename: str) -> None:
@@ -1003,7 +998,7 @@ def generate_build_tasks_to_build_all_files_in_directory(
         for filename in filenames:
             source_path = os.path.join(root, filename)
             target_path = source_path.replace(source, target)
-            ensure_directory_exists(target_path)
+            common.ensure_directory_exists(os.path.dirname(target_path))
             if should_file_be_built(source_path):
                 task = threading.Thread(
                     target=minify_func,
@@ -1033,7 +1028,7 @@ def generate_build_tasks_to_build_files_from_filepaths(
     for filepath in filepaths:
         source_file_path = os.path.join(source_path, filepath)
         target_file_path = os.path.join(target_path, filepath)
-        ensure_directory_exists(target_file_path)
+        common.ensure_directory_exists(os.path.dirname(target_file_path))
         if should_file_be_built(source_file_path):
             task = threading.Thread(
                 target=minify_func,
@@ -1070,11 +1065,8 @@ def generate_delete_tasks_to_remove_deleted_files(
             # Ignore files with certain extensions.
             if not any(
                     target_path.endswith(p) for p in FILE_EXTENSIONS_TO_IGNORE):
-                # On Windows the path is on Windows-Style, while the path in
-                # hashes is in posix style, we need to convert it so the check
-                # can run correctly.
-                relative_path = common.convert_to_posixpath(
-                    os.path.relpath(target_path, start=staging_directory))
+                relative_path = os.path.relpath(
+                    target_path, start=staging_directory)
                 # Remove file found in staging directory but not in source
                 # directory, i.e. file not listed in hash dict.
                 if relative_path not in source_dir_hashes:
@@ -1153,7 +1145,7 @@ def generate_build_tasks_to_build_directory(
     if not os.path.isdir(staging_dir):
         # If there is no staging dir, perform build process on all files.
         print('Creating new %s folder' % staging_dir)
-        ensure_directory_exists(staging_dir)
+        common.ensure_directory_exists(staging_dir)
         build_tasks += generate_build_tasks_to_build_all_files_in_directory(
             source_dir, staging_dir)
     else:
@@ -1264,20 +1256,12 @@ def _verify_hashes(
 
     hash_final_filename = _insert_hash(
         HASHES_JSON_FILENAME, file_hashes[HASHES_JSON_FILENAME])
-
-    # The path in hashes.json (generated via file_hashes) file is in posix
-    # style, see the comment above HASHES_JSON_FILENAME for details.
     third_party_js_final_filename = _insert_hash(
         MINIFIED_THIRD_PARTY_JS_RELATIVE_FILEPATH,
-        file_hashes[common.convert_to_posixpath(
-            MINIFIED_THIRD_PARTY_JS_RELATIVE_FILEPATH)])
-
-    # The path in hashes.json (generated via file_hashes) file is in posix
-    # style, see the comment above HASHES_JSON_FILENAME for details.
+        file_hashes[MINIFIED_THIRD_PARTY_JS_RELATIVE_FILEPATH])
     third_party_css_final_filename = _insert_hash(
         MINIFIED_THIRD_PARTY_CSS_RELATIVE_FILEPATH,
-        file_hashes[common.convert_to_posixpath(
-            MINIFIED_THIRD_PARTY_CSS_RELATIVE_FILEPATH)])
+        file_hashes[MINIFIED_THIRD_PARTY_CSS_RELATIVE_FILEPATH])
 
     _ensure_files_exist([
         os.path.join(ASSETS_OUT_DIR, hash_final_filename),
@@ -1394,6 +1378,7 @@ def generate_python_package() -> None:
         subprocess.check_call('python setup.py -q sdist -d build', shell=True)
         print('Oppia package build completed.')
     finally:
+        install_python_dev_dependencies.install_installation_tools()
         install_third_party_libs.main()
         print('Dev dependencies reinstalled')
 
@@ -1418,7 +1403,8 @@ def main(args: Optional[Sequence[str]] = None) -> None:
 
     # Regenerate /third_party/generated from scratch.
     safe_delete_directory_tree(THIRD_PARTY_GENERATED_DEV_DIR)
-    build_third_party_libs(THIRD_PARTY_GENERATED_DEV_DIR)
+    build_third_party_libs(
+        THIRD_PARTY_GENERATED_DEV_DIR)
 
     # If minify_third_party_libs_only is set to True, skips the rest of the
     # build process once third party libs are minified.
@@ -1438,12 +1424,13 @@ def main(args: Optional[Sequence[str]] = None) -> None:
     if options.prod_env:
         minify_third_party_libs(THIRD_PARTY_GENERATED_DEV_DIR)
         hashes = generate_hashes()
-        generate_python_package()
-        if options.source_maps:
-            build_using_webpack(WEBPACK_PROD_SOURCE_MAPS_CONFIG)
-        else:
-            build_using_webpack(WEBPACK_PROD_CONFIG)
-        build_using_ng()
+        if not feconf.OPPIA_IS_DOCKERIZED:
+            generate_python_package()
+            if options.source_maps:
+                build_using_webpack(WEBPACK_PROD_SOURCE_MAPS_CONFIG)
+            else:
+                build_using_webpack(WEBPACK_PROD_CONFIG)
+            build_using_ng()
         generate_app_yaml(
             deploy_mode=options.deploy_mode)
         generate_build_directory(hashes)

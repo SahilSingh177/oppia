@@ -20,9 +20,8 @@
  * followed by the name of the arg.
  */
 
-import { downgradeComponent } from '@angular/upgrade/static';
-import { Component, Input, OnInit } from '@angular/core';
-import { HtmlEscaperService } from 'services/html-escaper.service';
+import {Component, Input, OnInit} from '@angular/core';
+import {HtmlEscaperService} from 'services/html-escaper.service';
 
 export interface Answer {
   code: string;
@@ -30,7 +29,7 @@ export interface Answer {
 
 @Component({
   selector: 'oppia-response-pencil-code-editor',
-  templateUrl: './pencil-code-editor-response.component.html'
+  templateUrl: './pencil-code-editor-response.component.html',
 })
 export class ResponePencilCodeEditor implements OnInit {
   // These properties are initialized using Angular lifecycle hooks
@@ -39,17 +38,11 @@ export class ResponePencilCodeEditor implements OnInit {
   @Input() answer!: string;
   answerCode!: string;
 
-  constructor(
-    private htmlEscaperService: HtmlEscaperService
-  ) {}
+  constructor(private htmlEscaperService: HtmlEscaperService) {}
 
   ngOnInit(): void {
     this.answerCode = (
-      (this.htmlEscaperService.escapedJsonToObj(this.answer) as Answer).code);
+      this.htmlEscaperService.escapedJsonToObj(this.answer) as Answer
+    ).code;
   }
 }
-
-angular.module('oppia').directive(
-  'oppiaResponsePencilCodeEditor', downgradeComponent(
-    {component: ResponePencilCodeEditor}
-  ) as angular.IDirectiveFactory);

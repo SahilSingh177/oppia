@@ -20,7 +20,6 @@ from core import feconf
 from core.constants import constants
 from core.controllers import acl_decorators
 from core.controllers import base
-from core.domain import config_domain
 from core.domain import learner_group_fetchers
 from core.domain import learner_group_services
 from core.domain import story_fetchers
@@ -646,40 +645,6 @@ class ViewLearnerGroupInfoHandler(
         })
 
 
-class FacilitatorDashboardPage(
-    base.BaseHandler[Dict[str, str], Dict[str, str]]
-):
-    """Page showing the teacher dashboard."""
-
-    URL_PATH_ARGS_SCHEMAS: Dict[str, str] = {}
-    HANDLER_ARGS_SCHEMAS: Dict[str, Dict[str, str]] = {'GET': {}}
-
-    @acl_decorators.can_access_learner_groups
-    def get(self) -> None:
-        """Handles GET requests."""
-        if not config_domain.LEARNER_GROUPS_ARE_ENABLED.value:
-            raise self.PageNotFoundException
-
-        self.render_template('facilitator-dashboard-page.mainpage.html')
-
-
-class CreateLearnerGroupPage(
-    base.BaseHandler[Dict[str, str], Dict[str, str]]
-):
-    """Page for creating a new learner group."""
-
-    URL_PATH_ARGS_SCHEMAS: Dict[str, str] = {}
-    HANDLER_ARGS_SCHEMAS: Dict[str, Dict[str, str]] = {'GET': {}}
-
-    @acl_decorators.can_access_learner_groups
-    def get(self) -> None:
-        """Handles GET requests."""
-        if not config_domain.LEARNER_GROUPS_ARE_ENABLED.value:
-            raise self.PageNotFoundException
-
-        self.render_template('create-learner-group-page.mainpage.html')
-
-
 class LearnerGroupSearchLearnerHandlerNormalizedRequestDict(TypedDict):
     """Dict representation of LearnerGroupSearchLearnerHandler's
     normalized_request dictionary.
@@ -756,42 +721,6 @@ class LearnerGroupSearchLearnerHandler(
             'username': user_settings.username,
             'error': ''
         })
-
-
-class EditLearnerGroupPage(
-    base.BaseHandler[Dict[str, str], Dict[str, str]]
-):
-    """Page for editing a learner group."""
-
-    URL_PATH_ARGS_SCHEMAS = {
-        'group_id': {
-            'schema': {
-                'type': 'basestring',
-                'validators': [{
-                    'id': 'is_regex_matched',
-                    'regex_pattern': constants.LEARNER_GROUP_ID_REGEX
-                }]
-            }
-        }
-    }
-    HANDLER_ARGS_SCHEMAS: Dict[str, Dict[str, str]] = {
-        'GET': {}
-    }
-
-    @acl_decorators.can_access_learner_groups
-    def get(self, group_id: str) -> None:
-        """Handles GET requests."""
-        assert self.user_id is not None
-        if not config_domain.LEARNER_GROUPS_ARE_ENABLED.value:
-            raise self.PageNotFoundException
-
-        is_valid_request = learner_group_services.is_user_facilitator(
-            self.user_id, group_id)
-
-        if not is_valid_request:
-            raise self.PageNotFoundException
-
-        self.render_template('edit-learner-group-page.mainpage.html')
 
 
 class LearnerGroupLearnersInfoHandler(
@@ -1239,5 +1168,6 @@ class LearnerGroupsFeatureStatusHandler(
         """Handles GET requests."""
         self.render_json({
             'feature_is_enabled': (
-                config_domain.LEARNER_GROUPS_ARE_ENABLED.value)
+                learner_group_services.is_learner_group_feature_enabled(
+                    self.user_id))
         })

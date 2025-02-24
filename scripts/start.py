@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import os
 import time
 from typing import Iterator, Optional, Sequence
 
@@ -122,7 +123,7 @@ def notify_about_successful_shutdown() -> None:
 
 def call_extend_index_yaml() -> None:
     """Calls the extend_index_yaml.py script."""
-    print('\033[94m' + 'Extending index.yaml...' + '\033[0m')
+    print('\033[94mExtending index.yaml...\033[0m')
     extend_index_yaml.main()
 
 
@@ -174,13 +175,16 @@ def main(args: Optional[Sequence[str]] = None) -> None:
                 use_prod_env=False, use_source_maps=parsed_args.source_maps,
                 watch_mode=True))
 
+        env = os.environ.copy()
+        env['PIP_NO_DEPS'] = 'True'
         app_yaml_path = 'app.yaml' if parsed_args.prod_env else 'app_dev.yaml'
         dev_appserver = stack.enter_context(servers.managed_dev_appserver(
             app_yaml_path,
             enable_host_checking=not parsed_args.disable_host_checking,
             automatic_restart=not parsed_args.no_auto_restart,
             skip_sdk_update_check=True,
-            port=PORT_NUMBER_FOR_GAE_SERVER))
+            port=PORT_NUMBER_FOR_GAE_SERVER,
+            env=env))
 
         if parsed_args.no_browser:
             common.print_each_string_after_two_new_lines([

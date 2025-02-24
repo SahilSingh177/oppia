@@ -114,10 +114,10 @@ class _Gae(Platform):
             elif name == Names.BLOG:
                 from core.storage.blog import gae_models as blog_models
                 returned_models.append(blog_models)
-            elif name == Names.CLASSIFIER:
-                from core.storage.classifier import (
-                    gae_models as classifier_models)
-                returned_models.append(classifier_models)
+            elif name == Names.BLOG_STATISTICS:
+                from core.storage.blog_statistics import (
+                    gae_models as blog_stats_models)
+                returned_models.append(blog_stats_models)
             elif name == Names.CLASSROOM:
                 from core.storage.classroom import (
                     gae_models as classroom_models)
@@ -187,6 +187,10 @@ class _Gae(Platform):
             elif name == Names.USER:
                 from core.storage.user import gae_models as user_models
                 returned_models.append(user_models)
+            elif name == Names.VOICEOVER:
+                from core.storage.voiceover import (
+                    gae_models as voiceover_models)
+                returned_models.append(voiceover_models)
             else:
                 raise Exception('Invalid model name: %s' % name)
 
@@ -269,6 +273,21 @@ class _Gae(Platform):
         """
         from core.platform.app_identity import gae_app_identity_services
         return gae_app_identity_services
+
+    @classmethod
+    def import_azure_speech_synthesis_services(cls) -> ModuleType:
+        """Imports and returns azure_speech_synthesis_services module.
+
+        Returns:
+            module. The azure_speech_synthesis_services module.
+        """
+        if constants.DEV_MODE:
+            from core.platform.azure_speech_synthesis import (
+                dev_mode_azure_speech_synthesis_services)
+            return dev_mode_azure_speech_synthesis_services
+        from core.platform.azure_speech_synthesis import (
+            azure_speech_synthesis_services)
+        return azure_speech_synthesis_services
 
     @classmethod
     def import_email_services(cls) -> ModuleType:
@@ -498,6 +517,15 @@ class Registry:
             module. The app_identity_services module.
         """
         return cls._get().import_app_identity_services()
+
+    @classmethod
+    def import_azure_speech_synthesis_services(cls) -> ModuleType:
+        """Imports and returns azure_speech_synthesis_services module.
+
+        Returns:
+            module. The azure_speech_synthesis_services module.
+        """
+        return cls._get().import_azure_speech_synthesis_services()
 
     @classmethod
     def import_email_services(cls) -> ModuleType:

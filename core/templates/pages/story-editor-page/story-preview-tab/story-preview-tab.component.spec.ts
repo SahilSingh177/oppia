@@ -16,15 +16,14 @@
  * @fileoverview Unit tests for story preview tab component.
  */
 
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { EventEmitter } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { StoryEditorNavigationService } from
-  'pages/story-editor-page/services/story-editor-navigation.service';
-import { Story } from 'domain/story/story.model';
-import { StoryPreviewTabComponent } from './story-preview-tab.component';
-import { StoryEditorStateService } from '../services/story-editor-state.service';
-import { MockTranslatePipe } from 'tests/unit-test-utils';
+import {HttpClientTestingModule} from '@angular/common/http/testing';
+import {EventEmitter} from '@angular/core';
+import {ComponentFixture, TestBed} from '@angular/core/testing';
+import {StoryEditorNavigationService} from 'pages/story-editor-page/services/story-editor-navigation.service';
+import {Story} from 'domain/story/story.model';
+import {StoryPreviewTabComponent} from './story-preview-tab.component';
+import {StoryEditorStateService} from '../services/story-editor-state.service';
+import {MockTranslatePipe} from 'tests/unit-test-utils';
 
 class MockStoryEditorNavigationService {
   activeTab!: 'story_preview';
@@ -44,15 +43,17 @@ describe('Story Preview tab', () => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       declarations: [StoryPreviewTabComponent, MockTranslatePipe],
-      providers: [{
-        StoryEditorNavigationService,
-        provide: [
-          {
-            provide: StoryEditorNavigationService,
-            UseClass: MockStoryEditorNavigationService
-          }
-        ]
-      }]
+      providers: [
+        {
+          StoryEditorNavigationService,
+          provide: [
+            {
+              provide: StoryEditorNavigationService,
+              UseClass: MockStoryEditorNavigationService,
+            },
+          ],
+        },
+      ],
     }).compileComponents();
   });
   beforeEach(() => {
@@ -80,8 +81,14 @@ describe('Story Preview tab', () => {
             exploration_id: 'exp_1',
             outline_is_finalized: false,
             thumbnail_filename: 'img.png',
-            thumbnail_bg_color: '#a33f40'
-          }, {
+            thumbnail_bg_color: '#a33f40',
+            status: 'Published',
+            planned_publication_date_msecs: 10.0,
+            last_modified_msecs: 20.0,
+            first_publication_date_msecs: 10.0,
+            unpublishing_reason: null,
+          },
+          {
             id: 'node_2',
             title: 'Title 2',
             description: 'Description 2',
@@ -92,15 +99,21 @@ describe('Story Preview tab', () => {
             exploration_id: 'exp_2',
             outline_is_finalized: false,
             thumbnail_filename: 'img2.png',
-            thumbnail_bg_color: '#a33f40'
-          }],
-        next_node_id: 'node_3'
+            thumbnail_bg_color: '#a33f40',
+            status: 'Published',
+            planned_publication_date_msecs: 10.0,
+            last_modified_msecs: 20.0,
+            first_publication_date_msecs: 10.0,
+            unpublishing_reason: null,
+          },
+        ],
+        next_node_id: 'node_3',
       },
       language_code: 'en',
       thumbnail_filename: 'fileName',
       thumbnail_bg_color: 'blue',
       url_fragment: 'url',
-      meta_tag_content: 'meta'
+      meta_tag_content: 'meta',
     });
 
     storyInitializedEventEmitter = new EventEmitter();
@@ -110,11 +123,13 @@ describe('Story Preview tab', () => {
     spyOnProperty(storyEditorStateService, 'onStoryInitialized').and.callFake(
       () => {
         return storyInitializedEventEmitter;
-      });
+      }
+    );
     spyOnProperty(storyEditorStateService, 'onStoryReinitialized').and.callFake(
       () => {
         return storyReinitializedEventEmitter;
-      });
+      }
+    );
   });
 
   afterEach(() => {
@@ -131,18 +146,19 @@ describe('Story Preview tab', () => {
     component.ngOnInit();
     let node = story.getStoryContents().getNodes()[0];
     expect(component.getExplorationUrl(node)).toEqual(
-      '/explore/exp_1?story_id=storyId_0&node_id=node_1');
+      '/explore/exp_1?story_id=storyId_0&node_id=node_1'
+    );
     node = story.getStoryContents().getNodes()[1];
     expect(component.getExplorationUrl(node)).toEqual(
-      '/explore/exp_2?story_id=storyId_0&node_id=node_2');
+      '/explore/exp_2?story_id=storyId_0&node_id=node_2'
+    );
   });
 
-  it('should called initEditor on calls from story being initialized',
-    () => {
-      spyOn(component, 'initEditor').and.callThrough();
-      component.ngOnInit();
-      storyInitializedEventEmitter.emit();
-      storyReinitializedEventEmitter.emit();
-      expect(component.initEditor).toHaveBeenCalledTimes(3);
-    });
+  it('should called initEditor on calls from story being initialized', () => {
+    spyOn(component, 'initEditor').and.callThrough();
+    component.ngOnInit();
+    storyInitializedEventEmitter.emit();
+    storyReinitializedEventEmitter.emit();
+    expect(component.initEditor).toHaveBeenCalledTimes(3);
+  });
 });

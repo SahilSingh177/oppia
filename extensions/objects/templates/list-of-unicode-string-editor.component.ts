@@ -20,9 +20,8 @@
 // may be additional customization options for the editor that should be passed
 // in via initArgs.
 
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { downgradeComponent } from '@angular/upgrade/static';
-import { SchemaDefaultValue } from 'services/schema-default-value.service';
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {SchemaDefaultValue} from 'services/schema-default-value.service';
 
 interface ListOfUnicodeStringSchema {
   type: 'list';
@@ -34,7 +33,7 @@ interface ListOfUnicodeStringSchema {
 @Component({
   selector: 'list-of-unicode-string-editor',
   templateUrl: './list-editor.component.html',
-  styleUrls: []
+  styleUrls: [],
 })
 export class ListOfUnicodeStringEditorComponent implements OnInit {
   // These properties are initialized using Angular lifecycle hooks
@@ -46,8 +45,8 @@ export class ListOfUnicodeStringEditorComponent implements OnInit {
   SCHEMA: ListOfUnicodeStringSchema = {
     type: 'list',
     items: {
-      type: 'unicode'
-    }
+      type: 'unicode',
+    },
   };
 
   ngOnInit(): void {
@@ -66,8 +65,3 @@ export class ListOfUnicodeStringEditorComponent implements OnInit {
     this.valueChanged.emit(this.value);
   }
 }
-
-angular.module('oppia').directive(
-  'listOfUnicodeStringEditor', downgradeComponent({
-    component: ListOfUnicodeStringEditorComponent
-  }) as angular.IDirectiveFactory);

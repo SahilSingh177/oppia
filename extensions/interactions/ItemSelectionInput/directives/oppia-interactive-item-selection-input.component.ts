@@ -20,26 +20,25 @@
  * followed by the name of the arg.
  */
 
-import { Component, Input, OnInit } from '@angular/core';
-import { downgradeComponent } from '@angular/upgrade/static';
-import { ItemSelectionInputCustomizationArgs } from 'interactions/customization-args-defs';
-import { BrowserCheckerService } from 'domain/utilities/browser-checker.service';
-import { CurrentInteractionService } from 'pages/exploration-player-page/services/current-interaction.service';
-import { InteractionAttributesExtractorService } from 'interactions/interaction-attributes-extractor.service';
-import { ItemSelectionInputRulesService } from 'interactions/ItemSelectionInput/directives/item-selection-input-rules.service';
-import { SubtitledHtml } from 'domain/exploration/subtitled-html.model';
-import { AudioTranslationManagerService } from 'pages/exploration-player-page/services/audio-translation-manager.service';
-import { PlayerPositionService } from 'pages/exploration-player-page/services/player-position.service';
-import { PlayerTranscriptService } from 'pages/exploration-player-page/services/player-transcript.service';
-import { StateCard } from 'domain/state_card/state-card.model';
-import { RecordedVoiceovers } from 'domain/exploration/recorded-voiceovers.model';
+import {Component, Input, OnInit} from '@angular/core';
+import {ItemSelectionInputCustomizationArgs} from 'interactions/customization-args-defs';
+import {BrowserCheckerService} from 'domain/utilities/browser-checker.service';
+import {CurrentInteractionService} from 'pages/exploration-player-page/services/current-interaction.service';
+import {InteractionAttributesExtractorService} from 'interactions/interaction-attributes-extractor.service';
+import {ItemSelectionInputRulesService} from 'interactions/ItemSelectionInput/directives/item-selection-input-rules.service';
+import {SubtitledHtml} from 'domain/exploration/subtitled-html.model';
+import {AudioTranslationManagerService} from 'pages/exploration-player-page/services/audio-translation-manager.service';
+import {PlayerPositionService} from 'pages/exploration-player-page/services/player-position.service';
+import {PlayerTranscriptService} from 'pages/exploration-player-page/services/player-transcript.service';
+import {StateCard} from 'domain/state_card/state-card.model';
+import {RecordedVoiceovers} from 'domain/exploration/recorded-voiceovers.model';
 
 import '../static/item_selection_input.css';
 
 @Component({
   selector: 'oppia-interactive-item-selection-input',
   templateUrl: './item-selection-input-interaction.component.html',
-  styleUrls: []
+  styleUrls: [],
 })
 export class InteractiveItemSelectionInputComponent implements OnInit {
   // These properties are initialized using Angular lifecycle hooks
@@ -61,12 +60,12 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
   newQuestion: boolean = false;
   notEnoughSelections: boolean = false;
   preventAdditionalSelections: boolean = false;
+  exactSelections: boolean = false;
 
   constructor(
     private browserCheckerService: BrowserCheckerService,
     private currentInteractionService: CurrentInteractionService,
-    private interactionAttributesExtractorService:
-      InteractionAttributesExtractorService,
+    private interactionAttributesExtractorService: InteractionAttributesExtractorService,
     private itemSelectionInputRulesService: ItemSelectionInputRulesService,
     private audioTranslationManagerService: AudioTranslationManagerService,
     private playerPositionService: PlayerPositionService,
@@ -74,20 +73,17 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const {
-      choices,
-      maxAllowableSelectionCount,
-      minAllowableSelectionCount
-    } = this.interactionAttributesExtractorService.getValuesFromAttributes(
-      'ItemSelectionInput',
-      {
-        choicesWithValue: this.choicesWithValue,
-        maxAllowableSelectionCountWithValue:
-          this.maxAllowableSelectionCountWithValue,
-        minAllowableSelectionCountWithValue:
-          this.minAllowableSelectionCountWithValue
-      }
-    ) as ItemSelectionInputCustomizationArgs;
+    const {choices, maxAllowableSelectionCount, minAllowableSelectionCount} =
+      this.interactionAttributesExtractorService.getValuesFromAttributes(
+        'ItemSelectionInput',
+        {
+          choicesWithValue: this.choicesWithValue,
+          maxAllowableSelectionCountWithValue:
+            this.maxAllowableSelectionCountWithValue,
+          minAllowableSelectionCountWithValue:
+            this.minAllowableSelectionCountWithValue,
+        }
+      ) as ItemSelectionInputCustomizationArgs;
 
     this.choicesValue = choices.value;
     this.choices = this.choicesValue.map(choice => choice.html);
@@ -105,21 +101,25 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
 
     // Setup voiceover.
     this.displayedCard = this.playerTranscriptService.getCard(
-      this.playerPositionService.getDisplayedCardIndex());
+      this.playerPositionService.getDisplayedCardIndex()
+    );
     if (this.displayedCard) {
       this.recordedVoiceovers = this.displayedCard.getRecordedVoiceovers();
 
       // Combine labels for voiceover.
       let combinedChoiceLabels = '';
       for (const choiceLabel of this.choices) {
-        combinedChoiceLabels += this.audioTranslationManagerService
-          .cleanUpHTMLforVoiceover(choiceLabel);
+        combinedChoiceLabels +=
+          this.audioTranslationManagerService.cleanUpHTMLforVoiceover(
+            choiceLabel
+          );
       }
 
       // Say the choices aloud if autoplay is enabled.
       this.audioTranslationManagerService.setSequentialAudioTranslations(
         this.recordedVoiceovers.getBindableVoiceovers(this.getContentId()),
-        combinedChoiceLabels, this.COMPONENT_NAME_RULE_INPUT
+        combinedChoiceLabels,
+        this.COMPONENT_NAME_RULE_INPUT
       );
     }
 
@@ -131,9 +131,18 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
 
     // The following indicates that the number of answers is less than
     // minAllowableSelectionCount.
-    this.notEnoughSelections = this.minAllowableSelectionCount > 0;
+    this.notEnoughSelections =
+      (this.minAllowableSelectionCount > 0 &&
+        this.minAllowableSelectionCount < this.maxAllowableSelectionCount) ||
+      (this.minAllowableSelectionCount === 1 &&
+        this.maxAllowableSelectionCount === 1);
+
+    this.exactSelections =
+      this.minAllowableSelectionCount === this.maxAllowableSelectionCount;
     this.currentInteractionService.registerCurrentInteraction(
-      this.submitAnswer.bind(this), this.validityCheckFn.bind(this));
+      this.submitAnswer.bind(this),
+      this.validityCheckFn.bind(this)
+    );
   }
 
   getContentId(): string {
@@ -145,23 +154,45 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
     }
   }
 
+  getAnswers(): string[] {
+    const htmlAnswers = Object.keys(this.userSelections).filter(
+      obj => this.userSelections[obj]
+    );
+    return htmlAnswers.map(
+      html => this.choicesValue[this.choices.indexOf(html)].contentId as string
+    );
+  }
+
   onToggleCheckbox(): void {
     this.newQuestion = false;
     this.selectionCount = Object.keys(this.userSelections).filter(
-      (obj) => this.userSelections[obj]).length;
-    this.preventAdditionalSelections = (
-      this.selectionCount >= this.maxAllowableSelectionCount);
-    this.notEnoughSelections = (
-      this.selectionCount < this.minAllowableSelectionCount);
+      obj => this.userSelections[obj]
+    ).length;
+    if (this.minAllowableSelectionCount === this.maxAllowableSelectionCount) {
+      if (this.selectionCount < this.maxAllowableSelectionCount) {
+        this.exactSelections = true;
+        this.preventAdditionalSelections =
+          this.selectionCount >= this.maxAllowableSelectionCount;
+      } else {
+        this.exactSelections = false;
+        this.preventAdditionalSelections = true;
+      }
+    } else {
+      this.preventAdditionalSelections =
+        this.selectionCount >= this.maxAllowableSelectionCount;
+      this.notEnoughSelections =
+        this.selectionCount < this.minAllowableSelectionCount &&
+        this.minAllowableSelectionCount !== this.maxAllowableSelectionCount;
+      this.exactSelections = false;
+    }
+    this.currentInteractionService.updateCurrentAnswer(this.getAnswers());
   }
 
   submitMultipleChoiceAnswer(event: MouseEvent, index: number): void {
     event.preventDefault();
     // Deselect previously selected option.
-    var selectedElement = (
-      document.querySelector(
-        'button.multiple-choice-option.selected'
-      )
+    var selectedElement = document.querySelector(
+      'button.multiple-choice-option.selected'
     );
     if (selectedElement) {
       selectedElement.classList.remove('selected');
@@ -171,26 +202,18 @@ export class InteractiveItemSelectionInputComponent implements OnInit {
     this.userSelections = {};
     this.userSelections[this.choices[index]] = true;
     this.notEnoughSelections = false;
+    this.currentInteractionService.updateCurrentAnswer(this.getAnswers());
   }
 
   submitAnswer(): void {
-    const htmlAnswers = Object.keys(this.userSelections).filter(
-      (obj) => this.userSelections[obj]);
-    const answers = htmlAnswers.map(
-      html => this.choicesValue[this.choices.indexOf(html)].contentId);
-
+    const answers = this.getAnswers();
     this.currentInteractionService.onSubmit(
-      answers as string | string[],
-      this.itemSelectionInputRulesService as
-      ItemSelectionInputRulesService);
+      answers,
+      this.itemSelectionInputRulesService as ItemSelectionInputRulesService
+    );
   }
 
   validityCheckFn(): boolean {
     return !this.notEnoughSelections;
   }
 }
-
-angular.module('oppia').directive(
-  'oppiaInteractiveItemSelectionInput', downgradeComponent({
-    component: InteractiveItemSelectionInputComponent
-  }) as angular.IDirectiveFactory);
